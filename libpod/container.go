@@ -610,14 +610,30 @@ func (c *Container) WorkingDir() string {
 // State Accessors
 // Require locking
 
+func doSync(c *Container, ch chan error) {
+	if err := c.syncContainer(); err != nil {
+		ch <- err
+	}
+	ch <- nil
+}
+
 // State returns the current state of the container
 func (c *Container) State() (define.ContainerStatus, error) {
 	if !c.batched {
 		c.lock.Lock()
 		defer c.lock.Unlock()
 
-		if err := c.syncContainer(); err != nil {
+		ch := make(chan error, 1)
+		doSync(c, ch)
+		timer := time.NewTimer(20 * time.Second)
+		select {
+		case err := <-ch:
+			if err == nil {
+				return c.state.State, nil
+			}
 			return define.ContainerStateUnknown, err
+		case <-timer.C:
+			return define.ContainerStateUnknown, errors.Errorf("Atomix: timeout on %s", c.config.Name)
 		}
 	}
 	return c.state.State, nil

@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "shm_lock.h"
 
@@ -22,8 +23,13 @@ static size_t compute_shm_size(uint32_t num_bitmaps) {
 // Returns 0 on success, or positive errno on failure.
 static int take_mutex(pthread_mutex_t *mutex) {
   int ret_code;
+  time_t start, now;
 
+  start = time(0);
   do {
+    now = time(0);
+    if ((int)now - (int)start > 30)
+      return EINVAL;
     ret_code = pthread_mutex_lock(mutex);
   } while(ret_code == EAGAIN);
 
