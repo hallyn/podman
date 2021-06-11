@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"runtime/debug"
 
 	_ "github.com/containers/podman/v2/cmd/podman/completion"
 	_ "github.com/containers/podman/v2/cmd/podman/containers"
@@ -22,9 +24,19 @@ import (
 	"github.com/containers/storage/pkg/reexec"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/sys/unix"
 )
 
 func main() {
+	chSignal := make(chan os.Signal)
+	signal.Notify(chSignal, unix.SIGUSR1)
+	go func() {
+		for {
+			<-chSignal
+			debug.PrintStack()
+		}
+	}()
+
 	if reexec.Init() {
 		// We were invoked with a different argv[0] indicating that we
 		// had a specific job to do as a subprocess, and it's done.
